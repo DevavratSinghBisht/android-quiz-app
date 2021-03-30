@@ -28,9 +28,9 @@ public class BookmarkActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(layoutManager);
         List<QuestionModel> list = new ArrayList<>();
         list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
-        list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
-        list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
-        list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
+        list.add(new QuestionModel("What is your country?","","","","","Delhi",0));
+        list.add(new QuestionModel("What is your pet ?","","","","","Dog",0));
+        list.add(new QuestionModel("What is your school?","","","","","LHS",0));
         list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
         list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
         list.add(new QuestionModel("What is your name?","","","","","Vishwa Sankhe",0));
