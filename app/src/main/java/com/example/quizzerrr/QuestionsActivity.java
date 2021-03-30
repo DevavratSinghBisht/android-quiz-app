@@ -1,9 +1,14 @@
 package com.example.quizzerrr;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 import android.animation.Animator;
+import android.app.Dialog;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -12,15 +17,26 @@ import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
-import org.w3c.dom.Text;
-
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 public class QuestionsActivity extends AppCompatActivity {
+    public static final String FILE_NAME = "QUIZZER";
+    public static final String KEY_NAME = "QUESTIONS";
+    FirebaseDatabase database = FirebaseDatabase.getInstance();
+    DatabaseReference myRef = database.getReference();
 
     private TextView question, noIndicator;
     private FloatingActionButton bookmarkBtn;
@@ -30,9 +46,18 @@ public class QuestionsActivity extends AppCompatActivity {
     private List<QuestionModel> list;
     private int position = 0;
     private int score = 0;
+    private String category;
+    private int setNo;
+    private Dialog loadingDialog;
+    private List<QuestionModel> bookmarksList;
+    private SharedPreferences preferences;
+    private SharedPreferences.Editor editor;
+    private Gson gson;
+    private int matchedQuestionPosition;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_questions);
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -44,42 +69,100 @@ public class QuestionsActivity extends AppCompatActivity {
         optionsContainer = findViewById(R.id.options_container);
         shareBtn = findViewById(R.id.share_btn);
         nextBtn = findViewById(R.id.next_btn);
-
-        list = new ArrayList<>();
-        list.add(new QuestionModel("question 1", "a", "b", "c", "d", "a"));
-        list.add(new QuestionModel("question 2", "a", "b", "c", "d", "d"));
-        list.add(new QuestionModel("question 3", "a", "b", "c", "d", "b"));
-        list.add(new QuestionModel("question 4", "a", "b", "c", "d", "a"));
-        list.add(new QuestionModel("question 5", "a", "b", "c", "d", "c"));
-        list.add(new QuestionModel("question 6", "a", "b", "c", "d", "a"));
-        list.add(new QuestionModel("question 7", "a", "b", "c", "d", "d"));
-        list.add(new QuestionModel("question 8", "a", "b", "c", "d", "b"));
-
-        for (int i = 0; i < 4; i++){
-            optionsContainer.getChildAt(i).setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    checkAnswer((Button) view);
-                }
-            });
-        }
-
-        playAnim(question, 0, list.get(position).getQuestion());
-        nextBtn.setOnClickListener(new View.OnClickListener() {
+        category = getIntent().getStringExtra("category");
+        setNo = getIntent().getIntExtra("setNo",1);
+        preferences = getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE);
+        editor = preferences.edit();
+        gson = new Gson();
+        getBookmarks();
+        bookmarkBtn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
-                nextBtn.setEnabled(false);
-                nextBtn.setAlpha(0.7f);
-                enableOption(true);
-                position++;
-                if (position == list.size()){
-                    //score activity
-                    return;
+            public void onClick(View v) {
+                if(modelMatch()){
+                    bookmarksList.remove(matchedQuestionPosition);
+                    bookmarkBtn.setImageDrawable(getDrawable(R.drawable.bookmark_border));
+                }else{
+                    bookmarksList.add(list.get(position));
+                    bookmarkBtn.setImageDrawable(getDrawable(R.drawable.bookmark));
                 }
-                count=0;
-                playAnim(question, 0, list.get(position).getQuestion());
             }
         });
+        loadingDialog = new Dialog(this);
+        loadingDialog.setContentView(R.layout.loading);
+        loadingDialog.getWindow().setBackgroundDrawable(getDrawable(R.drawable.rounded_corners));
+        loadingDialog.getWindow().setLayout(LinearLayout.LayoutParams.WRAP_CONTENT,LinearLayout.LayoutParams.WRAP_CONTENT);
+        loadingDialog.setCancelable(false);
+
+
+
+
+        list = new ArrayList<>();
+
+
+        loadingDialog.show();
+        myRef.child("SETS").child(category).child("questions").orderByChild("setNo").equalTo(setNo).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                for(DataSnapshot snapshot :dataSnapshot.getChildren()){
+                    list.add(snapshot.getValue(QuestionModel.class));
+                }
+                if (list.size()>0){
+
+                    for (int i = 0; i < 4; i++){
+                        optionsContainer.getChildAt(i).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+                                checkAnswer((Button) view);
+                            }
+                        });
+                    }
+                    playAnim(question, 0, list.get(position).getQuestion());
+                    nextBtn.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            nextBtn.setEnabled(false);
+                            nextBtn.setAlpha(0.7f);
+                            enableOption(true);
+                            position++;
+                            if (position == list.size()){
+                                //score activity
+                                Intent scoreIntent = new Intent(QuestionsActivity.this,ScoreActivity.class);
+                                scoreIntent.putExtra("score",score);
+                                scoreIntent.putExtra("total",list.size());
+                                startActivity(scoreIntent);
+                                finish();
+                                return;
+                            }
+                            count=0;
+                            playAnim(question, 0, list.get(position).getQuestion());
+                        }
+                    });
+                }else{
+                    finish();
+                    Toast.makeText(QuestionsActivity.this,"No Questions", Toast.LENGTH_SHORT).show();
+                }
+                loadingDialog.dismiss();
+
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(QuestionsActivity.this, error.getMessage(), Toast.LENGTH_SHORT).show();
+                loadingDialog.dismiss();
+                finish();
+
+            }
+        });
+
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        storeBookmarks();
+
+
     }
 
     private void playAnim(View view, final int value, final String data){
@@ -87,6 +170,7 @@ public class QuestionsActivity extends AppCompatActivity {
         view.animate().alpha(value).scaleX(value).scaleY(value).setDuration(500).setStartDelay(100).setInterpolator(new DecelerateInterpolator()).setListener(new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animator) {
+
                 if (value == 0 && count<4){
                     String option = "";
                     if (count == 0 ){
@@ -109,6 +193,12 @@ public class QuestionsActivity extends AppCompatActivity {
                     try {
                         ((TextView)view).setText(data);
                         noIndicator.setText(position+1+"/"+list.size());
+                        if(modelMatch()){
+                            bookmarkBtn.setImageDrawable(getDrawable(R.drawable.bookmark));
+                        }else{
+                            bookmarkBtn.setImageDrawable(getDrawable(R.drawable.bookmark_border));
+
+                        }
                     }catch (ClassCastException ex){
                         ((Button)view).setText(data);
                     }
@@ -148,10 +238,33 @@ public class QuestionsActivity extends AppCompatActivity {
     private void enableOption(boolean enable){
         for (int i = 0; i < 4; i++){
             optionsContainer.getChildAt(i).setEnabled(enable);
-            if (enable){
-                optionsContainer.getChildAt(i).setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#989898")));
-            }
         }
+    }
+    private void getBookmarks(){
+        String json = preferences.getString(KEY_NAME,"");
+        Type type = new TypeToken<List<QuestionModel>>(){}.getType();
+        bookmarksList = gson.fromJson(json,type);
+        if(bookmarksList == null ){
+            bookmarksList = new ArrayList<>();
+        }
+    }
+    private boolean modelMatch(){
+        boolean matched = false;
+        int i =0;
+        for (QuestionModel model:bookmarksList){
+            if(model.getQuestion().equals(list.get(position).getQuestion()) && model.getCorrectANS().equals(list.get(position).getCorrectANS()) && model.getSetNo()== list.get(position).getSetNo()){
+                matched = true;
+                matchedQuestionPosition = i;
+            }
+            i++;
+        }
+        return matched;
+    }
+    private void storeBookmarks(){
+        String json = gson.toJson(bookmarksList);
+        editor.putString(KEY_NAME,json);
+        editor.commit();
+
     }
 
 }
