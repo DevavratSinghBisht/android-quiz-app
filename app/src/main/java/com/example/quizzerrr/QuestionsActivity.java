@@ -137,6 +137,22 @@ public class QuestionsActivity extends AppCompatActivity {
                             playAnim(question, 0, list.get(position).getQuestion());
                         }
                     });
+
+                    shareBtn.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            String body = list.get(position).getQuestion()
+                                    + "\n Option A: " + list.get(position).getOptionA()
+                                    + "\n Option B: " + list.get(position).getOptionB()
+                                    + "\n Option C: " + list.get(position).getOptionC()
+                                    + "\n Option D: " + list.get(position).getOptionD();
+                            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                            shareIntent.setType("plain/text");
+                            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Quizzer Challenge");
+                            shareIntent.putExtra(Intent.EXTRA_TEXT, body);
+                            startActivity(Intent.createChooser(shareIntent, "Share via"));
+                        }
+                    });
                 }else{
                     finish();
                     Toast.makeText(QuestionsActivity.this,"No Questions", Toast.LENGTH_SHORT).show();
@@ -161,8 +177,6 @@ public class QuestionsActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         storeBookmarks();
-
-
     }
 
     private void playAnim(View view, final int value, final String data){
@@ -240,6 +254,7 @@ public class QuestionsActivity extends AppCompatActivity {
             optionsContainer.getChildAt(i).setEnabled(enable);
         }
     }
+
     private void getBookmarks(){
         String json = preferences.getString(KEY_NAME,"");
         Type type = new TypeToken<List<QuestionModel>>(){}.getType();
@@ -248,6 +263,7 @@ public class QuestionsActivity extends AppCompatActivity {
             bookmarksList = new ArrayList<>();
         }
     }
+
     private boolean modelMatch(){
         boolean matched = false;
         int i =0;
@@ -260,6 +276,7 @@ public class QuestionsActivity extends AppCompatActivity {
         }
         return matched;
     }
+
     private void storeBookmarks(){
         String json = gson.toJson(bookmarksList);
         editor.putString(KEY_NAME,json);
