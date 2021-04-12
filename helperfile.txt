@@ -1,0 +1,3 @@
+1) open the folder in android studio
+2) click on run button on the top.
+3) you can see the app running.
